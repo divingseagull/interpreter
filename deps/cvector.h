@@ -4,6 +4,8 @@
  * License: The MIT License (MIT)
  */
 
+// repo: https://github.com/eteran/c-vector
+
 #ifndef CVECTOR_H_
 #define CVECTOR_H_
 
@@ -95,7 +97,7 @@ typedef struct cvector_metadata_t {
     ((void *)&((cvector_metadata_t *)(ptr))[1])
 
 /**
- * @brief cvector_capacity - gets the current capacity of the vector
+ * @brief cvector_capacity - gets the parser_current capacity of the vector
  * @param vec - the vector
  * @return the capacity as a size_t
  */
@@ -103,7 +105,7 @@ typedef struct cvector_metadata_t {
     ((vec) ? cvector_vec_to_base(vec)->capacity : (size_t)0)
 
 /**
- * @brief cvector_size - gets the current size of the vector
+ * @brief cvector_size - gets the parser_current size of the vector
  * @param vec - the vector
  * @return the size as a size_t
  */
@@ -129,7 +131,7 @@ typedef struct cvector_metadata_t {
 
 /**
  * @brief cvector_reserve - Requests that the vector capacity be at least enough
- * to contain n elements. If n is greater than the current vector capacity, the
+ * to contain n elements. If n is greater than the parser_current vector capacity, the
  * function causes the container to reallocate its storage increasing its
  * capacity to n (or greater).
  * @param vec - the vector
@@ -244,7 +246,7 @@ typedef struct cvector_metadata_t {
 /**
  * @brief cvector_compute_next_grow - returns an the computed size in next vector grow
  * size is increased by multiplication of 2
- * @param size - current size
+ * @param size - parser_current size
  * @return size after next vector grow
  */
 #define cvector_compute_next_grow(size) \
@@ -255,7 +257,7 @@ typedef struct cvector_metadata_t {
 /**
  * @brief cvector_compute_next_grow - returns an the computed size in next vector grow
  * size is increased by 1
- * @param size - current size
+ * @param size - parser_current size
  * @return size after next vector grow
  */
 #define cvector_compute_next_grow(size) \
