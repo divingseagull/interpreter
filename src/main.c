@@ -7,6 +7,8 @@
 #include "input.h"
 #include "token_types.h"
 #include "parser.h"
+#include "interpreter.h"
+#include "error.h"
 
 #define INPUT_MAX_LENGTH 4000
 
@@ -19,7 +21,7 @@ void run(char* source);
 
 int main(void) {
 //    runPrompt();
-    run("1 <= 1.5");
+    run("1<=1.5");
     return 0;
 }
 

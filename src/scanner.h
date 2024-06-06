@@ -20,11 +20,11 @@ bool scanner_match(char expected);
 char scanner_advance(void);
 char scanner_retreat(void);
 char *scanner_substring(size_t start, size_t end);
-void scanner_scan_token(void);
+static void scanner_scan_token(void);
 bool scanner_is_digit(char c);
 bool scanner_is_alpha(char c);
 bool scanner_is_alpha_numeric(char c);
-void scanner_number(void);
+static void scanner_number(void);
 void scanner_string(void);
 void scanner_identifier(void);
 void *parse_float(char *string);
@@ -54,12 +54,13 @@ extern inline cvector_vector_type(Token) scanner_tokenize(char *source) {
         Scanner._start = Scanner._current;
         scanner_scan_token();
     }
-    const Token t_eof = {
-            END_OF_FILE,
-            "",
-            { .null =  NULL },
-            LiteralTypeString[LITERALTYPE_NULL],
-            Scanner._line,
+    Token t_eof = {
+            .TokenTypes = END_OF_FILE,
+            .lexeme = "",
+            .literal_or_operator = { .literal.null =  NULL },
+            .literalType = LITERALTYPE_NULL,
+            .line = Scanner._line,
+            .address = &t_eof
     };
     cvector_push_back(Scanner._tokens, t_eof);
 
@@ -105,10 +106,10 @@ inline void scanner_scan_token(void) {
             // STAR
             scanner_add_token_enum(STAR, LITERALTYPE_OPERATOR);
             break;
-        case '%':
-            // PERCENT (MODULO)
-            scanner_add_token_enum(PERCENT, LITERALTYPE_OPERATOR);
-            break;
+//        case '%':
+//            // PERCENT (MODULO)
+//            scanner_add_token_enum(PERCENT, LITERALTYPE_OPERATOR);
+//            break;
         case ';':
             // SEMICOLON
             scanner_add_token_enum(SEMICOLON, LITERALTYPE_OPERATOR);
@@ -183,16 +184,17 @@ inline void scanner_add_token(TokenTypeEnum tokenType, LiteralUnion *literal, Li
     char *text = calloc(strlen(substring)+1, sizeof(char));
     strcpy(text, substring);
     // free(substring);
-    const Token token = {
+    Token token = {
         .TokenTypes = tokenType,
         .lexeme = text,
-        .literalType = LiteralTypeString[literalType],
+        .literalType = literalType,
         .line = Scanner._line,
-        .literal = {
+        .literal_or_operator.literal = {
             .null = literal->null,
-            ._int = literal->_int,
+//            ._int = literal->_int,
             ._float = literal->_float
-        }
+        },
+        .address = &token
     };
     cvector_push_back(Scanner._tokens, token);
 }
@@ -251,7 +253,7 @@ inline bool scanner_is_alpha_numeric(char c) {
 inline void scanner_number(void) {
     bool isFloat = false;
     while (scanner_is_digit(scanner_peek()) || scanner_peek() == '_') scanner_advance();
-    if (scanner_peek() == ' ') scanner_retreat();
+    if (scanner_is_digit(scanner_peek())) scanner_retreat();
 
     if (scanner_peek() == '.' && scanner_is_digit(scanner_peek_next())) {
         isFloat = true;
@@ -265,6 +267,7 @@ inline void scanner_number(void) {
     void *end_ptr = NULL;
     char *substring = scanner_substring(Scanner._start, Scanner._current);  // need to deallocation
 
+    isFloat = true;
     if (isFloat) {
         float literal = strtof(substring, end_ptr);
         LiteralUnion u = {
@@ -275,7 +278,7 @@ inline void scanner_number(void) {
             &u,
             LITERALTYPE_FLOAT
         );
-    } else {
+    }/* else {
         int literal = strtod(substring, end_ptr);
         LiteralUnion u = {
             ._int = literal
@@ -285,7 +288,7 @@ inline void scanner_number(void) {
             &u,
             LITERALTYPE_INT
         );
-    }
+    }*/
     // free(substring);
 }
 
@@ -317,7 +320,5 @@ inline void scanner_identifier(void) {
     // hashmap_new(sizeof(struct keywords), sizeof(KeywordEnum) / 4, )
     free(text);
 }
-
-
 
 #endif //INTERPRETER_SCANNER_H
