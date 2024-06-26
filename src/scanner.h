@@ -4,10 +4,9 @@
 #include <stdbool.h>
 
 #include "cvector.h"
-#include "hashmap.h"
 
-#include "token_types.h"
-#include "scanner.h"
+#include "types_token.h"
+#include "str.h"
 
 
 void scanner_init(char *source);
@@ -27,14 +26,9 @@ bool scanner_is_alpha_numeric(char c);
 static void scanner_number(void);
 void scanner_string(void);
 void scanner_identifier(void);
-void *parse_float(char *string);
 
-struct keywords {
-    char *keyword_str;
-    KeywordEnum keyword_value;
-};
 
-struct {
+struct Scanner {
     unsigned long long _start;
     unsigned long long _current;
     unsigned long long _line;
@@ -55,9 +49,12 @@ extern inline cvector_vector_type(Token) scanner_tokenize(char *source) {
         scanner_scan_token();
     }
     Token t_eof = {
-            .TokenTypes = END_OF_FILE,
-            .lexeme = "",
-            .literal_or_operator = { .literal.null =  NULL },
+            .TokenTypes = TOKEN_END_OF_FILE,
+            .lexeme = string_empty(),
+            .literal_or_operator = {
+                    .val.literal.null = NULL,
+                    .t = LITERAL,
+            },
             .literalType = LITERALTYPE_NULL,
             .line = Scanner._line,
             .address = &t_eof
@@ -70,79 +67,79 @@ extern inline cvector_vector_type(Token) scanner_tokenize(char *source) {
 inline void scanner_scan_token(void) {
     switch (scanner_peek()) {
         case '(':
-            scanner_add_token_enum(LEFT_PAREN, LITERALTYPE_OPERATOR);
+            scanner_add_token_enum(TOKEN_LEFT_PAREN, LITERALTYPE_OPERATOR);
             break;
         case ')':
-            // RIGHT_PAREN
-            scanner_add_token_enum(RIGHT_PAREN, LITERALTYPE_OPERATOR);
+            // TOKEN_RIGHT_PAREN
+            scanner_add_token_enum(TOKEN_RIGHT_PAREN, LITERALTYPE_OPERATOR);
             break;
         case ',':
-            // COMMA
-            scanner_add_token_enum(COMMA, LITERALTYPE_OPERATOR);
+            // TOKEN_COMMA
+            scanner_add_token_enum(TOKEN_COMMA, LITERALTYPE_OPERATOR);
             break;
         case '.':
-            // DOT
-            scanner_add_token_enum(DOT, LITERALTYPE_OPERATOR);
+            // TOKEN_DOT
+            scanner_add_token_enum(TOKEN_DOT, LITERALTYPE_OPERATOR);
             break;
         case '-':
-            // MINUS
-            scanner_add_token_enum(MINUS, LITERALTYPE_OPERATOR);
+            // TOKEN_MINUS
+            scanner_add_token_enum(TOKEN_MINUS, LITERALTYPE_OPERATOR);
             break;
         case '+':
-            // PLUS
-            scanner_add_token_enum(PLUS, LITERALTYPE_OPERATOR);
+            // TOKEN_PLUS
+            scanner_add_token_enum(TOKEN_PLUS, LITERALTYPE_OPERATOR);
             break;
         case '/':
-            // SLASH, COMMENT
-            if (scanner_peek_next() == '/') {  // COMMENT
+            // TOKEN_SLASH, DOUBLE_SLASH
+            if (scanner_peek_next() == '/') {  // DOUBLE_SLASH
                 while (scanner_peek() != '\n' && !scanner_is_at_end()) {
-                    Scanner._current++;
+                    scanner_advance();
                 }
-            } else {  // SLASH
-                scanner_add_token_enum(SLASH, LITERALTYPE_OPERATOR);
+            } else {  // TOKEN_SLASH
+                scanner_add_token_enum(TOKEN_SLASH, LITERALTYPE_OPERATOR);
             }
             break;
         case '*':
-            // STAR
-            scanner_add_token_enum(STAR, LITERALTYPE_OPERATOR);
+            // TOKEN_STAR
+            scanner_add_token_enum(TOKEN_STAR, LITERALTYPE_OPERATOR);
             break;
 //        case '%':
 //            // PERCENT (MODULO)
 //            scanner_add_token_enum(PERCENT, LITERALTYPE_OPERATOR);
 //            break;
         case ';':
-            // SEMICOLON
-            scanner_add_token_enum(SEMICOLON, LITERALTYPE_OPERATOR);
+            // TOKEN_SEMICOLON
+            scanner_add_token_enum(TOKEN_SEMICOLON, LITERALTYPE_OPERATOR);
             break;
         case ':':
-            scanner_add_token_enum(COLON, LITERALTYPE_OPERATOR);
-            // COLON
+            scanner_add_token_enum(TOKEN_COLON, LITERALTYPE_OPERATOR);
+            // TOKEN_COLON
             break;
         case '!':
-            // BANG, BANG_EQUAL
+            // TOKEN_BANG, TOKEN_BANG_EQUAL
             scanner_add_token_enum(
-                    scanner_match('=') ? BANG_EQUAL : BANG,
+                    scanner_match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG,
                     LITERALTYPE_OPERATOR
             );
             break;
         case '=':
-            // EQUAL, EQUAL_EQUAL
+            // TOKEN_EQUAL, TOKEN_EQUAL_EQUAL
             scanner_add_token_enum(
-                    scanner_match('=') ? EQUAL_EQUAL : EQUAL,
+                    scanner_match('=') ? TOKEN_EQUAL_EQUAL : TOKEN_EQUAL,
                     LITERALTYPE_OPERATOR
             );
             break;
         case '<':
-            // GREATER, GREATER_EQUAL
+            // TOKEN_GREATER, TOKEN_GREATER_EQUAL
             scanner_add_token_enum(
-                    scanner_match('=') ? GREATER_EQUAL : GREATER,
+                    scanner_match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER,
                     LITERALTYPE_OPERATOR
             );
             break;
         case '>':
-            // LESS, LESS_EQUAL
+            // TOKEN_LESS, TOKEN_LESS_EQUAL
             scanner_add_token_enum(
-                    scanner_match('=') ? LESS_EQUAL : LESS,
+                    scanner_match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS,
                     LITERALTYPE_OPERATOR
             );
             break;
@@ -186,16 +183,26 @@ inline void scanner_add_token(TokenTypeEnum tokenType, LiteralUnion *literal, Li
     // free(substring);
     Token token = {
         .TokenTypes = tokenType,
-        .lexeme = text,
+        .lexeme = string_from_array(text),
         .literalType = literalType,
         .line = Scanner._line,
-        .literal_or_operator.literal = {
-            .null = literal->null,
-//            ._int = literal->_int,
-            ._float = literal->_float
-        },
+        .literal_or_operator.t = LITERAL,
         .address = &token
     };
+    switch (literalType) {
+        case LITERALTYPE_NULL:
+            token.literal_or_operator.val.literal.null = literal->null;
+            break;
+        case LITERALTYPE_STRING:
+            token.literal_or_operator.val.literal.string = literal->string;
+            break;
+        case LITERALTYPE_FLOAT:
+            token.literal_or_operator.val.literal._float = literal->_float;
+            break;
+        case LITERALTYPE_BOOL:
+            token.literal_or_operator.val.literal._bool = literal->_bool;
+            break;
+    }
     cvector_push_back(Scanner._tokens, token);
 }
 
@@ -230,11 +237,14 @@ inline char scanner_retreat(void) {
 }
 
 inline char *scanner_substring(size_t start, size_t end) {
-    char *buf = calloc(end - start + 2, sizeof(char));
-    memcpy(buf, Scanner._source + start, end - start + 1);
-    buf[end - start + 1] = '\0';
+    // start - end = 0일 경우에도 1글자도 토큰화 할 수 있도록 최소한의 크기를 보장
+    size_t size = (end - start) > 1 ? (end - start) : 1;
+    char *buf = calloc(size, sizeof(char));
+    memcpy(buf, Scanner._source + start, size);
+    buf[size] = '\0';
     return buf;
 }
+
 
 inline bool scanner_is_digit(char c) {
     return ('0' <= c && c <= '9');
@@ -252,8 +262,7 @@ inline bool scanner_is_alpha_numeric(char c) {
 
 inline void scanner_number(void) {
     bool isFloat = false;
-    while (scanner_is_digit(scanner_peek()) || scanner_peek() == '_') scanner_advance();
-    if (scanner_is_digit(scanner_peek())) scanner_retreat();
+    while (scanner_is_digit(scanner_peek())) scanner_advance();
 
     if (scanner_peek() == '.' && scanner_is_digit(scanner_peek_next())) {
         isFloat = true;
@@ -263,6 +272,8 @@ inline void scanner_number(void) {
             scanner_advance();
         }
     }
+
+    if (!scanner_is_digit(scanner_peek())) scanner_retreat();
 
     void *end_ptr = NULL;
     char *substring = scanner_substring(Scanner._start, Scanner._current);  // need to deallocation
@@ -274,9 +285,9 @@ inline void scanner_number(void) {
             ._float = literal
         };
         scanner_add_token(
-            NUMBER,
-            &u,
-            LITERALTYPE_FLOAT
+                TOKEN_NUMBER,
+                &u,
+                LITERALTYPE_FLOAT
         );
     }/* else {
         int literal = strtod(substring, end_ptr);
@@ -284,7 +295,7 @@ inline void scanner_number(void) {
             ._int = literal
         };
         scanner_add_token(
-            NUMBER,
+            TOKEN_NUMBER,
             &u,
             LITERALTYPE_INT
         );
@@ -293,6 +304,7 @@ inline void scanner_number(void) {
 }
 
 inline void scanner_string(void) {
+    scanner_advance();
     while (scanner_peek() != '"' && !scanner_is_at_end()) {
         if (scanner_peek() == '\n') {
             Scanner._line++;
@@ -304,21 +316,79 @@ inline void scanner_string(void) {
         // error: unterminated scanner_string
     }
 
-    scanner_advance();
-
-    char *value = scanner_substring(Scanner._start + 1, Scanner._current);  // need to deallocation
+    // 시작한 지점은 겹따옴표, 끝나는 지점은 scanner_advance를 호출하지 않기 때문에 +1
+    char *value = scanner_substring(Scanner._start, Scanner._current+1);
     LiteralUnion u = {
         .string = value
     };
-    scanner_add_token(STRING, &u, LITERALTYPE_STRING);
+    scanner_add_token(TOKEN_STRING, &u, LITERALTYPE_STRING);
 }
 
 inline void scanner_identifier(void) {
-    while (scanner_is_alpha_numeric(scanner_peek())) scanner_advance();
+    // TODO: 변수 식별자는 맨 앞글자가 잘림
+    while (scanner_is_alpha_numeric(scanner_advance())) {
+        if (scanner_peek() == ';' ||
+            scanner_peek() == ' ') break;
+    };
 
     char *text = scanner_substring(Scanner._start, Scanner._current);
-    // hashmap_new(sizeof(struct keywords), sizeof(KeywordEnum) / 4, )
-    free(text);
+
+    LiteralUnion u = {
+            .string = text
+    };
+    TokenTypeEnum tokenType;
+    if (strcmp(text, "true") == 0) {
+        LiteralUnion literal_true = {
+                ._bool = true,
+        };
+        scanner_add_token(TOKEN_BOOL, &literal_true, LITERALTYPE_BOOL);
+        if (scanner_peek() == ';') scanner_retreat();
+        return;
+    }
+    if (strcmp(text, "false") == 0) {
+        LiteralUnion literal_false = {
+                ._bool = false,
+        };
+        scanner_add_token(TOKEN_BOOL, &literal_false, LITERALTYPE_BOOL);
+        if (scanner_peek() == ';') scanner_retreat();
+        return;
+    }
+    // keywords
+    else if (strcmp(text, "and") == 0) {
+        tokenType = TOKEN_AND;
+    }
+    else if (strcmp(text, "or") == 0) {
+        tokenType = TOKEN_OR;
+    }
+    else if (strcmp(text, "not") == 0) {
+        tokenType = TOKEN_NOT;
+    }
+    else if (strcmp(text, "if") == 0) {
+        tokenType = TOKEN_IF;
+    }
+    else if (strcmp(text, "else") == 0) {
+        tokenType = TOKEN_ELSE;
+    }
+    else if (strcmp(text, "for") == 0) {
+        tokenType = TOKEN_FOR;
+    }
+    else if (strcmp(text, "while") == 0) {
+        tokenType = TOKEN_WHILE;
+    }
+    else if (strcmp(text, "var") == 0) {
+        tokenType = TOKEN_VAR;
+    }
+    else if (strcmp(text, "print") == 0) {
+        tokenType = TOKEN_PRINT;
+    }
+    else {
+        tokenType = TOKEN_IDENTIFIER;
+        scanner_add_token(tokenType, &u, LITERALTYPE_IDENTIFIER);
+        if (scanner_peek() == ';') scanner_retreat();
+        return;
+    }
+    scanner_add_token(tokenType, &u, LITERALTYPE_KEYWORD);
+    if (scanner_peek() == ';') scanner_retreat();
 }
 
 #endif //INTERPRETER_SCANNER_H
